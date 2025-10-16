@@ -14,66 +14,83 @@ public class PackingListDAO {
         return DatabaseConfig.getConnection();
     }
 
-    // ✅ Initialize DB schema
-    public void initSchema() {
-        try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
+    // ✅ Enhanced Schema Initialization
+public void initSchema() {
+    System.out.println("🔄 Initializing database schema...");
+    
+    try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-                    email VARCHAR(100) UNIQUE,
-                    password VARCHAR(100),
-                    name VARCHAR(100)
-                )
-            """);
+        // Create users table first
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                email VARCHAR(100) UNIQUE,
+                password VARCHAR(100),
+                name VARCHAR(100)
+            )
+        """);
+        System.out.println("✅ Users table created/verified");
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS packing_lists (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-                    user_id INTEGER,
-                    list_name VARCHAR(100),
-                    destination VARCHAR(100),
-                    dates VARCHAR(100),
-                    type VARCHAR(50),
-                    description TEXT,
-                    created_date DATE DEFAULT CURRENT_DATE,
-                    FOREIGN KEY (user_id) REFERENCES users(id)
-                )
-            """);
+        // Create packing_list table
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS packing_list (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                user_id INTEGER,
+                list_name VARCHAR(100),
+                destination VARCHAR(100),
+                dates VARCHAR(100),
+                type VARCHAR(50),
+                description TEXT,
+                created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """);
+        System.out.println("✅ Packing_list table created/verified");
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS list_items (
-                    id INTEGER PRIMARY KEY AUTO_INCREMENT,
-                    list_id INTEGER,
-                    name VARCHAR(100),
-                    packed BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY (list_id) REFERENCES packing_list(id)
-                )
-            """);
+        // Create list_items table
+        stmt.execute("""
+            CREATE TABLE IF NOT EXISTS list_items (
+                id INTEGER PRIMARY KEY AUTO_INCREMENT,
+                list_id INTEGER,
+                name VARCHAR(100),
+                packed BOOLEAN DEFAULT FALSE,
+                FOREIGN KEY (list_id) REFERENCES packing_list(id) ON DELETE CASCADE
+            )
+        """);
+        System.out.println("✅ List_items table created/verified");
 
-            stmt.execute("""
-                INSERT IGNORE INTO users (id, email, password, name)
-                VALUES (1, 'user@example.com', 'pass', 'John Doe')
-            """);
+        // Insert sample data only if tables are empty
+        stmt.execute("""
+            INSERT IGNORE INTO users (id, email, password, name)
+            SELECT 1, 'user@example.com', 'pass', 'John Doe'
+            WHERE NOT EXISTS (SELECT 1 FROM users WHERE id = 1)
+        """);
 
-            stmt.execute("""
-                INSERT IGNORE INTO packing_lists (id, user_id, list_name, destination, dates, type, description)
-                VALUES (1, 1, 'Weekend Getaway', 'Beach', '2025-10-15 to 2025-10-17', 'Weekend', 'Sample trip')
-            """);
+        stmt.execute("""
+            INSERT IGNORE INTO packing_list (id, user_id, list_name, destination, dates, type, description)
+            SELECT 1, 1, 'Weekend Getaway', 'Beach', '2025-10-15 to 2025-10-17', 'Weekend', 'Sample trip'
+            WHERE NOT EXISTS (SELECT 1 FROM packing_list WHERE id = 1)
+        """);
 
-            stmt.execute("""
-                INSERT IGNORE INTO list_items (list_id, name)
-                VALUES (1, 'Passport'), (1, 'Phone Charger'), (1, 'Sunglasses'), (1, 'Toothbrush')
-            """);
+        stmt.execute("""
+            INSERT IGNORE INTO list_items (list_id, name)
+            SELECT 1, 'Passport' WHERE NOT EXISTS (SELECT 1 FROM list_items WHERE list_id = 1 AND name = 'Passport')
+        """);
 
-            System.out.println("✅ Schema initialized successfully");
+        stmt.execute("""
+            INSERT IGNORE INTO list_items (list_id, name)
+            SELECT 1, 'Phone Charger' WHERE NOT EXISTS (SELECT 1 FROM list_items WHERE list_id = 1 AND name = 'Phone Charger')
+        """);
 
-        } catch (SQLException e) {
-            System.err.println("❌ Schema initialization failed: " + e.getMessage());
-            e.printStackTrace();
-        }
+        System.out.println("✅ Sample data inserted/verified");
+        System.out.println("✅ Schema initialization completed successfully");
+
+    } catch (SQLException e) {
+        System.err.println("❌ Schema initialization failed: " + e.getMessage());
+        e.printStackTrace();
+        throw new RuntimeException("Schema initialization failed", e);
     }
-
+}
     // ✅ Create a new list
     public int createPackingList(String name, String destination, String dates, String type) {
         if (name == null || name.isEmpty() || destination == null || destination.isEmpty()) {
