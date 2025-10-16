@@ -1,0 +1,148 @@
+The errors indicate issues with your database schema and foreign key constraints. Here are the files that need to be corrected:
+
+1. PackingListDAO.java (Line 44) - Schema Initialization
+The foreign key constraint error suggests the tables are being created in the wrong order or with incorrect references.
+
+Fixed Schema Initialization:
+public void initSchema() {
+    String[] createTables = {
+        // Create users table first (if it doesn't exist)
+        "CREATE TABLE IF NOT EXISTS users (" +
+        "id INT AUTO_INCREMENT PRIMARY KEY, " +
+        "email VARCHAR(255) UNIQUE NOT NULL, " +
+        "password VARCHAR(255) NOT NULL, " +
+        "full_name VARCHAR(255), " +
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+
+        // Create packing_list table
+        "CREATE TABLE IF NOT EXISTS packing_list (" +
+        "id INT AUTO_INCREMENT PRIMARY KEY, " +
+        "user_id INT, " +
+        "name VARCHAR(255) NOT NULL, " +
+        "destination VARCHAR(255), " +
+        "start_date DATE, " +
+        "end_date DATE, " +
+        "trip_type VARCHAR(100), " +
+        "is_template BOOLEAN DEFAULT FALSE, " +
+        "is_shared BOOLEAN DEFAULT FALSE, " +
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+
+        // Create list_items table last (references packing_list)
+        "CREATE TABLE IF NOT EXISTS list_items (" +
+        "id INT AUTO_INCREMENT PRIMARY KEY, " +
+        "list_id INT, " +
+        "name VARCHAR(255) NOT NULL, " +
+        "is_packed BOOLEAN DEFAULT FALSE, " +
+        "category VARCHAR(100), " +
+        "FOREIGN KEY (list_id) REFERENCES packing_list(id) ON DELETE CASCADE)"
+    };
+
+    try (Connection conn = DatabaseConnection.getConnection();
+         Statement stmt = conn.createStatement()) {
+        
+        for (String sql : createTables) {
+            stmt.execute(sql);
+        }
+        System.out.println("✅ Schema initialized successfully!");
+        
+    } catch (SQLException e) {
+        System.err.println("❌ Schema initialization failed: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
+
+
+2. DatabaseConnection.java - Ensure proper database selection
+Make sure your connection URL includes the database name:
+
+
+public class DatabaseConnection {
+    private static final String URL = "jdbc:mysql://localhost:3306/packpal_db?useSSL=false&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASSWORD = "";
+    
+    public static Connection getConnection() throws SQLException {
+        try {
+            // Ensure database exists
+            Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/?useSSL=false&serverTimezone=UTC", USER, PASSWORD);
+            Statement stmt = conn.createStatement();
+            stmt.execute("CREATE DATABASE IF NOT EXISTS packpal_db");
+            stmt.close();
+            conn.close();
+            
+            // Connect to the specific database
+            return DriverManager.getConnection(URL, USER, PASSWORD);
+        } catch (SQLException e) {
+            throw new SQLException("Failed to connect to database", e);
+        }
+    }
+}
+
+
+3. DashboardView.java (Line 170 & 171) - Error Handling
+Add proper error handling for when tables don't exist yet:
+
+private JPanel createMyListsPanel() {
+    JPanel panel = new JPanel(new BorderLayout());
+    
+    try {
+        // Initialize schema first
+        PackingListDAO dao = new PackingListDAO();
+        dao.initSchema(); // This should create tables if they don't exist
+        
+        // Then try to get lists
+        List<PackingList> lists = dao.getLists();
+        
+        if (lists.isEmpty()) {
+            // Show empty state
+            JLabel emptyLabel = new JLabel("No packing lists yet. Create your first list!");
+            panel.add(emptyLabel, BorderLayout.CENTER);
+        } else {
+            // Display lists
+            // ... your existing list display code
+        }
+        
+    } catch (Exception e) {
+        System.err.println("Error loading lists: " + e.getMessage());
+        JLabel errorLabel = new JLabel("Error loading lists. Please try again.");
+        panel.add(errorLabel, BorderLayout.CENTER);
+    }
+    
+    return panel;
+}
+
+4. LoginController.java (Line 22) - Ensure proper flow
+Make sure the database is initialized before navigating to Dashboard:
+
+public void handleSignIn() {
+    // Validate credentials first
+    if (validateCredentials()) {
+        // Initialize database schema
+        PackingListDAO dao = new PackingListDAO();
+        dao.initSchema(); // Ensure tables exist
+        
+        // Then navigate to dashboard
+        view.setVisible(false);
+        DashboardView dashboard = new DashboardView();
+        dashboard.setVisible(true);
+    }
+}
+
+Quick Fix Summary:
+Fix the table creation order in PackingListDAO.initSchema()
+
+Ensure database exists in DatabaseConnection.getConnection()
+
+Add error handling in DashboardView.createMyListsPanel()
+
+Initialize schema before use in LoginController.handleSignIn()
+
+The main issues were:
+Foreign key error: Tables created in wrong order (list_items before packing_list)
+
+Table doesn't exist: Schema initialization failing, so subsequent queries fail
+
+No error recovery: Code didn't handle the case when tables don't exist
+
+Apply these fixes and your database connection should work properly!
