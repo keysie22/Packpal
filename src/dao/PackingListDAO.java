@@ -4,20 +4,19 @@ import database.DatabaseConfig;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import models.Item;
 
 public class PackingListDAO {
     private static final int USER_ID = 1; // Temporary user
-    private description description; // restored description class
 
     private Connection getConnection() throws SQLException {
         return DatabaseConfig.getConnection();
     }
 
-    // ✅ Initialize DB schema
+    // ✅ Fixed Schema Initialization
     public void initSchema() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
 
+            // Create users table first
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -27,8 +26,9 @@ public class PackingListDAO {
                 )
             """);
 
+            // FIXED: Changed table name from packing_lists to packing_list (consistent naming)
             stmt.execute("""
-                CREATE TABLE IF NOT EXISTS packing_lists (
+                CREATE TABLE IF NOT EXISTS packing_list (
                     id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     user_id INTEGER,
                     list_name VARCHAR(100),
@@ -37,27 +37,30 @@ public class PackingListDAO {
                     type VARCHAR(50),
                     description TEXT,
                     created_date DATE DEFAULT CURRENT_DATE,
-                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             """);
 
+            // FIXED: Corrected foreign key reference to packing_list (not packing_lists)
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS list_items (
                     id INTEGER PRIMARY KEY AUTO_INCREMENT,
                     list_id INTEGER,
                     name VARCHAR(100),
                     packed BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY (list_id) REFERENCES packing_list(id)
+                    FOREIGN KEY (list_id) REFERENCES packing_list(id) ON DELETE CASCADE
                 )
             """);
 
+            // Insert sample data
             stmt.execute("""
                 INSERT IGNORE INTO users (id, email, password, name)
                 VALUES (1, 'user@example.com', 'pass', 'John Doe')
             """);
 
+            // FIXED: Using packing_list table name
             stmt.execute("""
-                INSERT IGNORE INTO packing_lists (id, user_id, list_name, destination, dates, type, description)
+                INSERT IGNORE INTO packing_list (id, user_id, list_name, destination, dates, type, description)
                 VALUES (1, 1, 'Weekend Getaway', 'Beach', '2025-10-15 to 2025-10-17', 'Weekend', 'Sample trip')
             """);
 
@@ -74,7 +77,7 @@ public class PackingListDAO {
         }
     }
 
-    // ✅ Create a new list
+    // ✅ Create a new list - FIXED: Removed description reference
     public int createPackingList(String name, String destination, String dates, String type) {
         if (name == null || name.isEmpty() || destination == null || destination.isEmpty()) {
             System.err.println("❌ Invalid input");
@@ -85,13 +88,11 @@ public class PackingListDAO {
         String safeDest = destination == null ? "" : destination.trim();
         String safeDates = dates == null ? "" : dates.trim();
         String safeType = type == null ? "" : type.trim();
-        String safeDescription = (description != null && description.getText() != null)
-                ? description.getText().trim()
-                : "";
+        String safeDescription = ""; // FIXED: Removed problematic description reference
 
         try (Connection conn = getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                     "INSERT INTO packing_lists (user_id, list_name, destination, dates, type, description) VALUES (?, ?, ?, ?, ?, ?)",
+                     "INSERT INTO packing_list (user_id, list_name, destination, dates, type, description) VALUES (?, ?, ?, ?, ?, ?)",
                      Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setInt(1, USER_ID);
@@ -123,7 +124,7 @@ public class PackingListDAO {
         return -1;
     }
 
-    // ✅ Get lists
+    // ✅ Get lists - FIXED: Using correct table name packing_list
     public List<PackingList> getLists() {
         List<PackingList> lists = new ArrayList<>();
         try (Connection conn = getConnection();
@@ -215,7 +216,8 @@ public class PackingListDAO {
 
     public List<ListItem> getItemsByListId(int listId) {
         List<ListItem> items = new ArrayList<>();
-        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(
+        try (Connection conn = getConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT id, name, packed FROM list_items WHERE list_id = ?")) {
             stmt.setInt(1, listId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -231,7 +233,8 @@ public class PackingListDAO {
     }
 
     public void setItemPackedStatus(int itemId, boolean packed) {
-        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(
+        try (Connection conn = getConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(
                 "UPDATE list_items SET packed = ? WHERE id = ?")) {
             stmt.setBoolean(1, packed);
             stmt.setInt(2, itemId);
@@ -243,7 +246,8 @@ public class PackingListDAO {
     }
 
     public int getTotalItemsCount(int listId) {
-        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(
+        try (Connection conn = getConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT COUNT(*) FROM list_items WHERE list_id = ?")) {
             stmt.setInt(1, listId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -258,7 +262,8 @@ public class PackingListDAO {
     }
 
     public int getPackedItemsCount(int listId) {
-        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(
+        try (Connection conn = getConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT COUNT(*) FROM list_items WHERE list_id = ? AND packed = 1")) {
             stmt.setInt(1, listId);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -272,8 +277,9 @@ public class PackingListDAO {
         return 0;
     }
 
+    // FIXED: Implemented the missing method
     public List<ListItem> getListItems(int listId) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return getItemsByListId(listId); // Reuse existing implementation
     }
 
     // ✅ Helper classes
@@ -310,24 +316,5 @@ public class PackingListDAO {
 
         public void setName(String name) { this.name = name; }
         public void setPacked(boolean packed) { this.packed = packed; }
-    }
-
-    // ✅ description class restored
-    public static class description {
-        private String text;
-
-        public description() {}
-
-        public description(String text) {
-            this.text = text;
-        }
-
-        public String getText() {
-            return text;
-        }
-
-        public void setText(String text) {
-            this.text = text;
-        }
     }
 }
