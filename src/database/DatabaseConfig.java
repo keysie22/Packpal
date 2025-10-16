@@ -27,14 +27,18 @@ public class DatabaseConfig {
         return conn;
     }
 
-    public static boolean testConnection() {
-        try {
-            Connection testConn = getConnection();
-            return testConn != null && !testConn.isClosed();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
+    // In DatabaseConfig.java - ensure this method exists
+public static boolean testConnection() {
+    try (Connection conn = getConnection()) {
+        // Test with a simple query
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("SELECT 1");
         }
+        System.out.println("✅ Database connection test successful");
+        return true;
+    } catch (SQLException e) {
+        System.err.println("❌ Database connection test failed: " + e.getMessage());
+        return false;
     }
 }
 
