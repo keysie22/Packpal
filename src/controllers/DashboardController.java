@@ -14,14 +14,14 @@ public class DashboardController {
         this.view = view;
     }
 
-    public void handleBackToWelcome() {
-        view.navigateToWelcome();
-    }
+   public void handleBackToWelcome() {
+    view.navigateToWelcome();
+}
 
-    public void handleLogout() {
-        new WelcomeView();
-        view.dispose();
-    }
-
+public void handleLogout() {
+    view.setVisible(false);
+    WelcomeView welcomeView = new WelcomeView();
+    welcomeView.setVisible(true);
+}
     // Add methods for tab actions if needed, e.g., handleEditList(String listName)
 }
